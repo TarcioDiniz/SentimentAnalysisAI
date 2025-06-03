@@ -1,47 +1,30 @@
 ﻿import json
-import os
-import string
-from typing import Optional
-from pathlib import Path
-
 import nltk
 import openai
+import os
+import string
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
 from openai import OpenAIError
+from pathlib import Path
 from pydantic import BaseModel
+from typing import Optional
 
-
-# -------------------------
-# Configuração de diretórios
-# -------------------------
-BASE_DIR = Path(__file__).parent              # /caminho/para/meu_projeto
-STATIC_DIR = BASE_DIR / "static"               # /caminho/para/meu_projeto/static
-
-# -------------------------
-# Carregar variável de ambiente (API Key)
-# -------------------------
+BASE_DIR = Path(__file__).parent
+PUBLIC_DIR = BASE_DIR / "public"
 
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 if openai.api_key is None:
     raise RuntimeError("Faltou definir a variável de ambiente OPENAI_API_KEY no teu .env")
-
-# Inicialização NLTK (download só de stopwords)
 nltk.download("stopwords")
 STOPWORDS_PT = set(stopwords.words("portuguese"))
 TOKENIZER = RegexpTokenizer(r"\w+")
-
-# FastAPI app
 app = FastAPI(title="API de Análise de Sentimento")
 
-
-# ----------------------------------------------------------
-# Funções internas de pré-processamento e chamada ao ChatGPT
-# ----------------------------------------------------------
 
 def preprocess_text(text: str) -> str:
     """
@@ -83,7 +66,7 @@ def call_chatgpt_for_sentiment(preprocessed: str) -> dict:
             temperature=0.0,
         )
         content = resp.choices[0].message.content.strip()
-        # Tenta converter a string JSON em dict
+
         return json.loads(content)
 
     except OpenAIError as e:
@@ -98,10 +81,6 @@ def call_chatgpt_for_sentiment(preprocessed: str) -> dict:
         raise HTTPException(status_code=502, detail="Não foi possível interpretar a resposta do ChatGPT como JSON.")
 
 
-# --------------------------------------------
-# Modelos Pydantic para validação de input/output
-# --------------------------------------------
-
 class SentimentRequest(BaseModel):
     text: str
 
@@ -111,13 +90,8 @@ class SentimentResponse(BaseModel):
     neu: float
     pos: float
     compound: float
-    # Se quiseres incluir um campo opcional de erro (nunca ambos simultaneamente):
     error: Optional[str] = None
 
-
-# --------------------------
-# Endpoints da API
-# --------------------------
 
 @app.post("/analyze-sentiment", response_model=SentimentResponse)
 async def analyze_sentiment(req: SentimentRequest):
@@ -128,18 +102,14 @@ async def analyze_sentiment(req: SentimentRequest):
     if not texto_original:
         raise HTTPException(status_code=400, detail="O campo 'text' não pode estar vazio.")
 
-    # 1) Pré-processar
     texto_limpo = preprocess_text(texto_original)
 
-    # 2) Chamar ChatGPT e obter JSON
     resultado = call_chatgpt_for_sentiment(texto_limpo)
 
-    # 3) Validar que o JSON retornado contém as chaves necessárias
     for chave in ("neg", "neu", "pos", "compound"):
         if chave not in resultado:
             raise HTTPException(status_code=502, detail=f"Resposta inesperada do ChatGPT: faltou a chave '{chave}'.")
 
-    # 4) Converter valores para float e devolver
     try:
         return SentimentResponse(
             neg=float(resultado["neg"]),
@@ -150,10 +120,7 @@ async def analyze_sentiment(req: SentimentRequest):
     except (ValueError, TypeError):
         raise HTTPException(status_code=502, detail="Valores inválidos no JSON devolvido pelo ChatGPT.")
 
+
 @app.get("/", response_class=FileResponse)
 async def root():
-    return FileResponse("static/index.html", media_type="text/html")
-
-@app.get("/static/{file_path:path}")
-async def serve_static(file_path: str):
-    return FileResponse(f"static/{file_path}")
+    return FileResponse(PUBLIC_DIR / "index.html", media_type="text/html")

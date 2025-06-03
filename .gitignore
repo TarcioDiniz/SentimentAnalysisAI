@@ -28,3 +28,7 @@ dist-ssr
 # IntelliJ / JetBrains
 **/.idea/
 /.idea/
+
+**/.venv/
+/.venv/
+.vercel
