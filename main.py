@@ -126,3 +126,8 @@ async def analyze_sentiment(req: SentimentRequest):
 @app.get("/", response_class=FileResponse)
 async def root():
     return FileResponse(PUBLIC_DIR / "index.html", media_type="text/html")
+
+
+@app.get("/public/{file_path:path}")
+async def serve_static(file_path: str):
+    return FileResponse(f"{PUBLIC_DIR}/{file_path}")
