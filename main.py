@@ -1,17 +1,17 @@
 ﻿import json
-import nltk
-import openai
 import os
 import string
+from pathlib import Path
+from typing import Optional
+
+import nltk
+import openai
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
-from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
 from openai import OpenAIError
-from pathlib import Path
 from pydantic import BaseModel
-from typing import Optional
 
 BASE_DIR = Path(__file__).parent
 PUBLIC_DIR = BASE_DIR / "public"
@@ -20,7 +20,9 @@ load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 if openai.api_key is None:
     raise RuntimeError("Faltou definir a variável de ambiente OPENAI_API_KEY no teu .env")
-nltk.download("stopwords")
+nltk.data.path.append(str(BASE_DIR / "nltk_data"))
+from nltk.corpus import stopwords
+
 STOPWORDS_PT = set(stopwords.words("portuguese"))
 TOKENIZER = RegexpTokenizer(r"\w+")
 app = FastAPI(title="API de Análise de Sentimento")
